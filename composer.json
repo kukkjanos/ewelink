@@ -1,0 +1,23 @@
+{
+    "name": "kukkjanos/ewelink",
+    "type": "library",
+    "description": "EWeLink Smart Home API Methods",
+    "keywords": ["EWeLink", "classes"],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Janos KUKK",
+            "email": "kukk.janos@gmail.com"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "EWeLink\\": "src/"
+        }
+    },
+    "require": {
+        "php": ">=5.5",
+        "guzzlehttp/guzzle": "^6.3",
+        "sarahman/simple-filesystem-cache": "^1.0"
+    }
+}
