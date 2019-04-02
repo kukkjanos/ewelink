@@ -19,8 +19,6 @@ $options = [
         'region'   => 'eu'
     ],
     'settings' => [
-        'token'        => 'abc', // (not working for now)
-        'allowed_ips'  => ['x.x.x.x'], // Allowed ip address (not working for now)
         'cachedir' => './cache', // Token cache directory
         'cachetime' => 3600, // The expiration time, defaults to 3600
         
