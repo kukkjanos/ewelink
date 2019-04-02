@@ -2,38 +2,55 @@
 
 namespace EWeLink\Api;
 
-use GuzzleHttp\Client;
+use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\Exception\GuzzleException;
+
+use WebSocket\Client as WebSocketClient;
 use Sarahman\SimpleCache\FileSystemCache;
 
 abstract class Api
 {
-    protected $config; // Config object
+    // Config object
+    protected $config;
 
     public function __construct($config)
     {
-        // Init variable
+        // Init variable and/or Build cache
         $this->config = $config;
 
-        // Cache library (file base implementation)
-        $cache = new FileSystemCache(isset($this->config->settings['cachedir'])?$this->config->settings['cachedir']:'./cache'); // the custom cache directory can be set through the parameter.
+        // Init Guzzle
+        $this->GuzzleClient = new GuzzleClient();
 
-        // Check cached key exists or not or expired.
-        if ($cache->has('ewelink_token') == FALSE)
-        {
-            // Get new token
-            if ($data = $this->auth()) {
-                $cache->set('ewelink_token', $data, isset($this->config->settings['cachetime'])?$this->config->settings['cachetime']:3600);
-            }
-        }
-        
-        $this->cache = $cache->get('ewelink_token');
+        // Build cache (need Guzzle)
+        $this->cache = $this->cacheBuild();
+
+        // Init WebSocket (need Cache)
+        $this->WebSocketClient = new WebSocketClient('wss://'. $this->getWebSocketDomain() .':8080/api/ws');
 
         return $config;
     }
 
+    // Cache build
+    private function cacheBuild($force = FALSE)
+    {
+        // Cache library (file base implementation)
+        $cache = new FileSystemCache($this->getCachedir()); // the custom cache directory can be set through the parameter.
+
+        // Check cached key exists or not or expired.
+        if ($cache->has('ewelink_token') == $force)
+        {
+            // Get new token
+            if ($data = $this->authProc()) {
+                $cache->set('ewelink_token', $data, isset($this->config->settings['cachetime'])?$this->config->settings['cachetime']:3600);
+            }
+        }
+        
+        // Build
+        return $cache->get('ewelink_token');
+    }
+
     // Auth process get token
-    public function auth()
+    private function authProc()
     {
         $appDetails = [
             'password'  => $this->config->auth['password'],
@@ -72,19 +89,104 @@ abstract class Api
         
         $sign = base64_encode($hashMac);
 
-        $client = new Client(['debug' => false]);
-
-        $response = $client->request('POST', 'https://eu-api.coolkit.cc:8080/api/user/login', [
+        $response = $this->GuzzleClient->request('POST', 'https://'. $this->getRegion() .'-api.coolkit.cc:8080/api/user/login', [
             'json' => $appDetails,
             'headers' => [
                 'Authorization' => 'Sign ' . $sign,
             ]
         ]);
 
-        if ($response->getStatusCode() == 200) {
-            return json_decode($response->getBody(), true);
+        if ($response->getStatusCode() == 200)
+        {
+            $bodyResponse = json_decode($response->getBody(), true);
+
+            if (isset($bodyResponse['error']))
+            {
+                switch ($bodyResponse['error'])
+                {
+                    case 301:
+                        throw new \Exception('Regio error! Please change region: '. $bodyResponse['region']);
+                        break;
+
+                    case 401:
+                        throw new \Exception('Auth error');
+                        break;
+
+                    default:
+                        throw new \Exception('Fatal error: '. $bodyResponse['error']);
+                        break;
+                }
+            } else {
+                return json_decode($response->getBody(), true);
+            }
         }
 
         return false;
     }
+
+    public function sendWSMessage($payload = array())
+    {
+        $initPayload = array(
+            'action'     => 'userOnline',
+            'userAgent'  => 'app',
+            'version'    => 6,
+            'nonce'      => rand(10000, 99999).rand(10000, 99999).rand(10000, 99999),
+            'apkVesrion' => "1.8",
+            'os'         => 'ios',
+            'at'         => $this->cache['at'],
+            'apikey'     => $this->cache['user']['apikey'],
+            'ts'         => time(),
+            'model'      => 'iPhone10,6',
+            'romVersion' => '11.1.2',
+            'sequence'   => time()
+        );
+
+        $initPayloadString = json_encode($initPayload);
+
+        $this->WebSocketClient->send($initPayloadString);
+        $resp = json_decode($this->WebSocketClient->receive(), true);
+
+        if (!empty($payload))
+        {
+            $payloadString = json_encode($payload);
+
+            $this->WebSocketClient->send($payloadString);
+            $resp = json_decode($this->WebSocketClient->receive(), true);
+        }
+
+        if ($resp['error']) {
+            return ['error' => $resp['error']];
+        } else {
+            return ['params' => $payload['params']];
+        }
+    }
+
+    public function getAuthHeader()
+    {
+        return ['Authorization' => 'Bearer ' . $this->cache['at']];
+    }
+
+    private function getWebSocketDomain()
+    {
+        $response = $this->GuzzleClient->request('POST', 'https://'. $this->getRegion() .'-disp.coolkit.cc:8080/dispatch/app', ['headers' => $this->getAuthHeader()]);
+
+        $domain = json_decode($response->getBody(), true);
+
+        if (isset($domain['error']) && $domain['error'] == 0) {
+            return $domain['domain'];
+        } else {
+            throw new Exception('Domain dispatch error');
+        }
+    }
+
+    private function getRegion()
+    {
+        return isset($this->cache['region'])?$this->cache['region']:$this->config->auth['region'];
+    }
+
+    private function getCachedir()
+    {
+        return isset($this->config->settings['cachedir'])?$this->config->settings['cachedir']:'./cache';
+    }
+
 }

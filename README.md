@@ -33,6 +33,14 @@ $config = new EWeLink\Api\Config($options);
 // Init API
 $api = new EWeLink\Api\EWeApi($config);
 
-// Devices
+// All device
 print_r( $api->getDevices() );
+
+// One device
+$deviceId = 'xyz';
+print_r( $api->getDevice($deviceId) );
+
+// Toogle device
+//print_r( $api->toggleDevice($deviceId) );
+
 ```
