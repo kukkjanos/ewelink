@@ -14,14 +14,14 @@ class EWeApi extends Api
 
     public function getDevices()
     {
-        $response = $this->EWeAPI->request('GET', 'https://'. $this->cache['region'] .'-api.coolkit.cc:8080/api/user/device?lang=en&apiKey='. $this->cache['user']['apikey'] .'&getTags=1', ['headers' => $this->getAuthHeader()]);
+        $response = $this->EWeAPI->request('GET', 'https://'. $this->cache['region'] .'-api.coolkit.cc:8080/api/user/device?appid=oeVkj2lYFGnJu5XUtWisfW4utiN4u9Mq&lang=en&apiKey='. $this->cache['user']['apikey'] .'&getTags=1', ['headers' => $this->getAuthHeader()]);
 
         return json_decode($response->getBody(), true);
     }
 
     public function getDevice($deviceId)
     {
-        $response = $this->EWeAPI->request('GET', 'https://'. $this->cache['region'] .'-api.coolkit.cc:8080/api/user/device/'. $deviceId .'?lang=en&apiKey='. $this->cache['user']['apikey'] .'&getTags=1', ['headers' => $this->getAuthHeader()]);
+        $response = $this->EWeAPI->request('GET', 'https://'. $this->cache['region'] .'-api.coolkit.cc:8080/api/user/device/'. $deviceId .'?appid=oeVkj2lYFGnJu5XUtWisfW4utiN4u9Mq&lang=en&apiKey='. $this->cache['user']['apikey'] .'&getTags=1', ['headers' => $this->getAuthHeader()]);
 
         return json_decode($response->getBody(), true);
     }
